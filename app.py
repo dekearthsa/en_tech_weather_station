@@ -110,13 +110,13 @@ def get_data_temp(token):
         return {"session":True, "data":root}
 
 
-def convert_data(data_session):
+def convert_data(data_session, sensor_type):
     records = []
     for item in data_session['data'].findall('Items'):
         io_dt = item.findtext('IODateTime')
         val = item.findtext('Value')
         if io_dt and val:
-            records.append({'IODateTime': io_dt, 'Value': float(val)})
+            records.append({'IODateTime': io_dt, 'Value': float(val), "sensor": sensor_type})
     df = pd.DataFrame(records)
     df_old, result_out = read_db()
     if result_out == False:
@@ -160,6 +160,9 @@ def read_db():
         "$lt": end_date
         }
     })
+    print("fetch data")
+    print(docs)
+    print("\n")
     if not docs:
         return [],  False
     else:
@@ -173,20 +176,20 @@ def main():
     if data_session['session'] == False:
         re_token = read_token_store()
         data_session = get_data_humid(re_token)
-        df = convert_data(data_session)
+        df = convert_data(data_session, "humid")
         insert_into_db(df)
     else:
-        df = convert_data(data_session)
+        df = convert_data(data_session, "humid")
         insert_into_db(df)
 
     data_session = get_data_temp(token)
     if data_session['session'] == False:
         re_token = read_token_store()
         data_session = get_data_temp(re_token)
-        df = convert_data(data_session)
+        df = convert_data(data_session, "temp")
         insert_into_db(df)
     else:
-        df = convert_data(data_session)
+        df = convert_data(data_session, "temp")
         insert_into_db(df)
 
 main()
