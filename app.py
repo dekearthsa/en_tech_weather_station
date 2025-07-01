@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 from pymongo import MongoClient
 
-MONGO_URI = "mongodb://localhost:27017"
+MONGO_URI = ""
 client = MongoClient(MONGO_URI)
 
 db = client["rangsit_weather"]          
@@ -118,15 +118,26 @@ def convert_data(data_session, sensor_type):
         if io_dt and val:
             records.append({'IODateTime': io_dt, 'Value': float(val), "sensor": sensor_type})
     df = pd.DataFrame(records)
-    df_old, result_out = read_db()
-    if result_out == False:
+    df_old = read_db(sensor_type)
+
+    if len(df_old) == 0:
+        print('1')
         return df
     else:
-        ## drop dup df_old ##
-        combined = pd.concat([df, df_old], ignore_index=True)
-        unique_rows = combined.drop_duplicates(keep=False)
-        print(unique_rows.head())
-        return unique_rows
+ 
+        df["IODateTime"] = pd.to_datetime(df["IODateTime"])
+        if df_old["IODateTime"].dtype != "datetime64[ns]":
+            df_old["IODateTime"] = pd.to_datetime(df_old["IODateTime"]).dt.tz_localize(None)
+        
+        df_new = df.merge(
+            df_old,
+            on=["IODateTime", "Value", "sensor"],
+            how="left",
+            indicator=True
+        )
+        df_result = df_new[df_new["_merge"] == "left_only"].drop(columns="_merge")
+ 
+        return df_result
 
 def read_token_store():
     try:
@@ -146,9 +157,9 @@ def insert_into_db(df):
         result = col.insert_many(records)
         print("Inserted", len(result.inserted_ids), "documents.")
     else:
-        print("DataFrame ว่าง ไม่ได้ insert อะไรเลย")
+        print("DataFrame not insert no new data.")
 
-def read_db():
+def read_db(sensor_type):
     day = datetime.today().strftime('%d')
     month = datetime.today().strftime('%m')
     year = datetime.today().strftime('%Y')
@@ -158,17 +169,20 @@ def read_db():
     "IODateTime": {
         "$gte": start_date,
         "$lt": end_date
-        }
+        },
+        "sensor": sensor_type
     })
-    print("fetch data")
-    print(docs)
-    print("\n")
-    if not docs:
-        return [],  False
-    else:
-        df = pd.DataFrame(docs).drop(columns=["_id"], errors="ignore")
-        print(df.head())
-        return df,  True
+    df = pd.DataFrame(docs).drop(columns=["_id"], errors="ignore")
+    # print("df => ", len(df))
+
+    return df
+    # print("docs => ",docs)
+    # if docs == "<pymongo.synchronous.cursor.Cursor object at 0x105e82290>":
+    #     return [],  False
+    # else:
+    #     df = pd.DataFrame(docs).drop(columns=["_id"], errors="ignore")
+    #     # print(df.head())
+    #     return df,  True
 
 def main():
     token = read_token_store()
