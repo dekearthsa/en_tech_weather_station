@@ -118,11 +118,15 @@ def convert_data(data_session):
         if io_dt and val:
             records.append({'IODateTime': io_dt, 'Value': float(val)})
     df = pd.DataFrame(records)
-    df_old = read_db()
-    combined = pd.concat([df, df_old], ignore_index=True)
-    unique_rows = combined.drop_duplicates(keep=False)
-    print(unique_rows.head())
-    return unique_rows
+    df_old, result_out = read_db()
+    if result_out == False:
+        return df
+    else:
+        ## drop dup df_old ##
+        combined = pd.concat([df, df_old], ignore_index=True)
+        unique_rows = combined.drop_duplicates(keep=False)
+        print(unique_rows.head())
+        return unique_rows
 
 def read_token_store():
     try:
@@ -156,11 +160,12 @@ def read_db():
         "$lt": end_date
         }
     })
-    df = pd.DataFrame(list(docs))
-    if "_id" in df.columns:
-        df = df.drop(columns=["_id"])
-
-    return df
+    if not docs:
+        return [],  False
+    else:
+        df = pd.DataFrame(docs).drop(columns=["_id"], errors="ignore")
+        print(df.head())
+        return df,  True
 
 def main():
     token = read_token_store()
