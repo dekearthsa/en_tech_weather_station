@@ -43,7 +43,7 @@ def func_login():
             },
             "full": full_cookie
         }
-        print(transformed)
+        # print(transformed)
         with open("token.json", "w") as f:
             json.dump(transformed, f, indent=2)
         return transformed
@@ -121,7 +121,7 @@ def convert_data(data_session, sensor_type):
     df_old = read_db(sensor_type)
 
     if len(df_old) == 0:
-        print('1')
+        # print('1')
         return df
     else:
  
@@ -149,8 +149,15 @@ def read_token_store():
         print("not found token try login: ",e)
         token = func_login()
         return token
+
+def re_read_token():
+    token = func_login()
+    with open("token.json", "w") as f:
+        json.dump(token, f, indent=2)
+    return token
     
 def insert_into_db(df):
+    print(df)
     df["IODateTime"] = pd.to_datetime(df["IODateTime"]) 
     records = df.to_dict(orient="records")
     if records:                        
@@ -173,23 +180,15 @@ def read_db(sensor_type):
         "sensor": sensor_type
     })
     df = pd.DataFrame(docs).drop(columns=["_id"], errors="ignore")
-    # print("df => ", len(df))
-
     return df
-    # print("docs => ",docs)
-    # if docs == "<pymongo.synchronous.cursor.Cursor object at 0x105e82290>":
-    #     return [],  False
-    # else:
-    #     df = pd.DataFrame(docs).drop(columns=["_id"], errors="ignore")
-    #     # print(df.head())
-    #     return df,  True
 
 def main():
     token = read_token_store()
     data_session = get_data_humid(token)
     if data_session['session'] == False:
-        re_token = read_token_store()
+        re_token = re_read_token()
         data_session = get_data_humid(re_token)
+        # print("data_session => ", data_session)
         df = convert_data(data_session, "humid")
         insert_into_db(df)
     else:
@@ -198,7 +197,7 @@ def main():
 
     data_session = get_data_temp(token)
     if data_session['session'] == False:
-        re_token = read_token_store()
+        re_token = re_read_token()
         data_session = get_data_temp(re_token)
         df = convert_data(data_session, "temp")
         insert_into_db(df)
